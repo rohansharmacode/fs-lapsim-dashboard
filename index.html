@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FS Lap-Sim Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0d0f12;--card:#161a20;--line:#2a313b;--txt:#e8eaed;--mut:#9aa4b2;--a:#3fb8ff;--b:#ff8a3d;--good:#3ddc84;--bad:#ff5c5c;--warn:#ffcc4d;--red:#e10600}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:14px 16px;border-bottom:3px solid var(--red);background:#11141a}
+h1{margin:0;font-size:20px;letter-spacing:.5px;text-transform:uppercase}
+.note{margin:4px 0 0;color:var(--mut);font-size:12px}
+main{max-width:1200px;margin:0 auto;padding:12px}
+.cfgs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
+.card h2{margin:0 0 8px;font-size:15px;text-transform:uppercase;letter-spacing:.5px}
+#cfgA h2{color:var(--a)} #cfgB h2{color:var(--b)}
+h3{margin:10px 0 4px;font-size:12px;color:var(--mut);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:2px}
+label.row{display:grid;grid-template-columns:1fr 120px;gap:6px;align-items:center;padding:2px 0}
+label.row small{grid-column:1/-1;color:var(--warn);font-size:11px}
+label.row small:empty{display:none}
+input,select{width:100%;background:#0f1216;color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:5px 6px;font:inherit}
+input:focus,select:focus{outline:2px solid var(--a);outline-offset:-1px}
+.bar{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}
+button{background:var(--red);color:#fff;border:0;border-radius:4px;padding:8px 14px;font:600 13px system-ui;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-size:12px;text-transform:uppercase}
+th.a{color:var(--a)} th.b{color:var(--b)}
+td.good{color:var(--good);font-weight:600} td.bad{color:var(--bad);font-weight:600}
+.charts{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}
+.cw{position:relative;height:300px}
+.mut{color:var(--mut);font-size:12px}
+@media (max-width:760px){.cfgs,.charts{grid-template-columns:1fr} label.row{grid-template-columns:1fr 100px} .cw{height:240px} th,td{padding:5px 4px;font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+<h1>FS Lap-Sim Dashboard</h1>
+<p class="note">Simulated estimates from a point-mass model, not measured telemetry.</p>
+</header>
+<main>
+<div class="cfgs">
+<section class="card" id="cfgA"><h2>Baseline (A)</h2><div class="form"></div></section>
+<section class="card" id="cfgB"><h2>Modified (B)</h2><div class="form"></div></section>
+</div>
+<div class="bar"><button id="copy" type="button">Copy A to B</button><span class="mut">Results update live on any change.</span></div>
+<section class="card"><h2>Results</h2>
+<table><thead><tr><th>Output</th><th class="a">A</th><th class="b">B</th><th>Delta (B minus A)</th></tr></thead><tbody id="res"></tbody></table>
+</section>
+<div class="charts">
+<section class="card"><h2>Autocross: speed vs distance</h2><div class="cw"><canvas id="lapChart"></canvas></div></section>
+<section class="card"><h2>Acceleration: speed vs time</h2><div class="cw"><canvas id="accChart"></canvas></div></section>
+</div>
+<p class="mut" id="trackInfo"></p>
+</main>
+
+<script id="phys">
+/* Quasi-steady point-mass lap sim. Assumptions:
+   - Single point mass, no yaw/transient dynamics, no tyre load sensitivity.
+   - Air density fixed at 1.2 kg/m^3. Downforce and drag scale with v^2.
+   - Combined grip uses a friction ellipse: a_x available = a_x_max * sqrt(1 - (a_y/a_y_max)^2).
+   - Longitudinal load transfer uses m*a*h/L with a taken as tyre force / m (drag ignored in transfer).
+   - CV engine: torque rises linearly (60% to 100%) up to the peak-torque rpm, then constant power to
+     peak-power rpm, then power falls linearly to 85% at the rev limit. Below the peak-torque rpm in
+     1st gear the clutch is assumed to slip, so launch uses that curve directly.
+   - CV shift time applies only in the acceleration run (zero drive force while shifting).
+   - Autocross starts from standstill; car holds steady state in a corner at the grip limit. */
+const RHO = 1.2, G0 = 9.81, SKID_R = 9.125, DS = 0.5;
+
+// [key, label, unit, default, hard min, hard max, typical low, typical high, powertrain or '']
+// Strings starting with '#' are section headings.
+const FIELDS = [
+  '#Powertrain',
+  ['evP', 'Motor peak power', 'kW', 80, 1, 200, 20, 80, 'EV'],
+  ['evT', 'Motor peak torque', 'Nm', 230, 10, 1000, 50, 400, 'EV'],
+  ['evRpm', 'Motor max rpm', 'rpm', 20000, 1000, 40000, 5000, 25000, 'EV'],
+  ['evG', 'Gear ratio', '', 13.0, 1, 30, 4, 16, 'EV'],
+  ['evEff', 'Drivetrain efficiency', '', 0.92, 0.5, 1, 0.8, 0.97, 'EV'],
+  ['cvP', 'Engine peak power', 'kW', 60, 1, 200, 30, 90, 'CV'],
+  ['cvT', 'Engine peak torque', 'Nm', 60, 5, 300, 30, 120, 'CV'],
+  ['cvRpmPk', 'Peak power rpm', 'rpm', 11500, 2000, 20000, 7000, 14000, 'CV'],
+  ['cvRpmLim', 'Rev limit', 'rpm', 13000, 2000, 22000, 8000, 15000, 'CV'],
+  ['cvPrim', 'Primary drive ratio', '', 2.11, 0.5, 5, 1.5, 3, 'CV'],
+  ['cvFin', 'Final drive ratio', '', 3.0, 0.5, 8, 2, 5, 'CV'],
+  ['cvShift', 'Shift time', 's', 0.05, 0, 1, 0.02, 0.2, 'CV'],
+  ['cvEff', 'Drivetrain efficiency', '', 0.85, 0.5, 1, 0.75, 0.95, 'CV'],
+  '#Chassis',
+  ['m', 'Total mass incl driver', 'kg', 280, 100, 600, 180, 350, ''],
+  ['wf', 'Weight distribution front', '%', 47, 20, 80, 40, 55, ''],
+  ['h', 'CoG height', 'm', 0.28, 0.1, 0.8, 0.2, 0.35, ''],
+  ['L', 'Wheelbase', 'm', 1.53, 0.8, 3, 1.525, 1.75, ''],
+  ['tw', 'Track width', 'm', 1.2, 0.6, 2, 1.1, 1.3, ''],
+  ['r', 'Wheel/tyre radius', 'm', 0.23, 0.1, 0.5, 0.2, 0.27, ''],
+  '#Tyres',
+  ['muX', 'Longitudinal mu', '', 1.5, 0.3, 3, 1.2, 1.8, ''],
+  ['muY', 'Lateral mu', '', 1.5, 0.3, 3, 1.2, 1.8, ''],
+  '#Aero',
+  ['ClA', 'CL*A (+ = downforce)', 'm²', 3.0, -1, 8, 0, 4.5, ''],
+  ['CdA', 'CD*A', 'm²', 1.3, 0.1, 4, 0.6, 1.8, ''],
+  ['ab', 'Aero balance front', '%', 45, 0, 100, 35, 55, ''],
+  '#Brakes and resistance',
+  ['bb', 'Brake bias front', '%', 65, 30, 90, 55, 75, ''],
+  ['crr', 'Rolling resistance coeff', '', 0.015, 0, 0.1, 0.01, 0.03, ''],
+];
+const DEF_GEARS = '2.75,2.0,1.67,1.44,1.29,1.18';
+const DEF_MASS = { EV: 280, CV: 270 };
+
+function defaults(type) {
+  const p = { type, drive: 'RWD', gears: DEF_GEARS.split(',').map(Number) };
+  FIELDS.forEach(f => { if (Array.isArray(f)) p[f[0]] = f[3]; });
+  p.m = DEF_MASS[type];
+  return p;
+}
+
+// Generic FS-style autocross: [length] = straight, [radius, angle deg] = corner. About 860 m.
+const TRACK = [[60], [9, 90], [40], [12, 60], [12, 60], [12, 60], [12, 60], [4.5, 180], [70], [15, 90], [45],
+  [7, 120], [30], [10, 50], [10, 50], [10, 50], [10, 50], [55], [6, 180], [40], [9, 90], [65], [25, 45], [20],
+  [5, 180], [50], [18, 90], [45], [11, 55], [11, 55], [11, 55], [11, 55], [8, 135], [35]];
+// Radius per 0.5 m point (Infinity on straights); N segments gives N+1 points.
+const TRACK_R = (() => {
+  const R = [];
+  TRACK.forEach(s => {
+    const straight = s.length === 1, len = straight ? s[0] : s[0] * s[1] * Math.PI / 180;
+    for (let i = 0, n = Math.round(len / DS); i < n; i++) R.push(straight ? Infinity : s[0]);
+  });
+  R.push(R[R.length - 1]);
+  return R;
+})();
+
+const downforce = (p, v) => 0.5 * RHO * p.ClA * v * v;
+const resist = (p, v) => 0.5 * RHO * p.CdA * v * v + p.crr * Math.max(p.m * G0 + downforce(p, v), 0);
+const aLatMax = (p, v) => p.muY * Math.max(p.m * G0 + downforce(p, v), 0) / p.m;
+
+function cvTorque(p, rpm) { // engine torque (Nm) at crank rpm
+  if (rpm > p.cvRpmLim) return 0;
+  const rT = Math.min(p.cvP * 1000 / p.cvT * 60 / (2 * Math.PI), p.cvRpmPk), w = Math.max(rpm, 1) * 2 * Math.PI / 60;
+  if (rpm < rT) return p.cvT * (0.6 + 0.4 * Math.max(rpm, 0) / rT);
+  if (rpm <= p.cvRpmPk) return Math.min(p.cvT, p.cvP * 1000 / w);
+  return p.cvP * 1000 * (1 - 0.15 * (rpm - p.cvRpmPk) / Math.max(p.cvRpmLim - p.cvRpmPk, 1)) / w;
+}
+
+// Wheel drive force (N) from the powertrain at speed v; CV picks the best gear >= minGear.
+function drive(p, v, minGear = 1) {
+  const wheelRpm = v / p.r * 60 / (2 * Math.PI);
+  if (p.type === 'EV') {
+    if (wheelRpm * p.evG > p.evRpm) return { F: 0, g: 1 }; // motor speed cap
+    return { F: Math.min(p.evT * p.evG * p.evEff / p.r, p.evP * 1000 * p.evEff / Math.max(v, 0.1)), g: 1 };
+  }
+  let best = { F: 0, g: minGear };
+  p.gears.forEach((gr, i) => {
+    if (i + 1 < minGear) return;
+    const ratio = gr * p.cvPrim * p.cvFin, F = cvTorque(p, wheelRpm * ratio) * ratio * p.cvEff / p.r;
+    if (F > best.F) best = { F, g: i + 1 };
+  });
+  return best;
+}
+
+// Traction limit (N): driven-axle normal load (static + aero share + load transfer) * mu.
+// RWD transfer solved in closed form: F = mu*(Nr0 + F*h/L).
+function tracLimit(p, v) {
+  const D = downforce(p, v);
+  if (p.drive === 'AWD') return p.muX * Math.max(p.m * G0 + D, 0);
+  const Nr = Math.max(p.m * G0 * (1 - p.wf / 100) + D * (1 - p.ab / 100), 0);
+  return p.muX * Nr / Math.max(1 - p.muX * p.h / p.L, 0.2);
+}
+
+// Max tyre braking force (N): the axle that locks first limits (bias vs load incl. transfer).
+function brakeLimit(p, v) {
+  const D = downforce(p, v), N = Math.max(p.m * G0 + D, 0), Nf = Math.max(p.m * G0 * p.wf / 100 + D * p.ab / 100, 0);
+  const Nr = Math.max(N - Nf, 0), k = p.muX * p.h / p.L, b = p.bb / 100;
+  const Ff = b - k > 0 ? p.muX * Nf / (b - k) : Infinity, Fr = p.muX * Nr / (1 - b + k);
+  return Math.min(p.muX * N, Ff, Fr);
+}
+
+// Steady-state cornering speed at radius R with downforce: v^2 = muY*R*(g + k v^2/m), closed form.
+function vCorner(p, R) {
+  if (!isFinite(R)) return Infinity;
+  const den = 1 - p.muY * R * 0.5 * RHO * p.ClA / p.m;
+  return den <= 0 ? 150 : Math.min(Math.sqrt(p.muY * R * G0 / den), 150); // cap at topSpeed bound (m/s)
+}
+
+function topSpeed(p) {
+  let v = 1;
+  while (v < 150 && Math.min(drive(p, v).F, tracLimit(p, v)) > resist(p, v)) v += 0.05;
+  return v;
+}
+
+function accelRun(p) {
+  const dt = 0.001, tr = [{ x: 0, y: 0 }];
+  let v = 0, x = 0, t = 0, gear = 1, shiftT = 0, aMax = 0, n = 0;
+  while (x < 75 && t < 30) {
+    const d = drive(p, v, gear); // upshift only, no hunting
+    if (d.g > gear) { gear = d.g; if (p.type === 'CV') shiftT = p.cvShift; }
+    const Fd = shiftT > 0 ? 0 : Math.min(d.F, tracLimit(p, v));
+    shiftT -= dt;
+    const a = (Fd - (v > 0 ? resist(p, v) : 0)) / p.m;
+    aMax = Math.max(aMax, a);
+    v = Math.max(v + a * dt, 0); x += v * dt; t += dt;
+    if (++n % 20 === 0) tr.push({ x: +t.toFixed(2), y: v * 3.6 });
+  }
+  return { t: x < 75 ? Infinity : t, aMax, tr };
+}
+
+function lapSim(p, vTop) {
+  const R = TRACK_R, n = R.length, lim = R.map(r => Math.min(vCorner(p, r), vTop));
+  const ell = (v, r) => { const ay = isFinite(r) ? v * v / r : 0; return Math.sqrt(Math.max(0, 1 - (ay / aLatMax(p, v)) ** 2)); };
+  const f = new Array(n), b = new Array(n);
+  f[0] = 0; // standing start
+  for (let i = 0; i < n - 1; i++) {
+    const v = f[i];
+    let a = (Math.min(drive(p, v).F, tracLimit(p, v) * ell(v, R[i])) - resist(p, v)) / p.m;
+    if (v >= lim[i] * 0.999) a = Math.max(a, 0); // steady-state cornering at the limit
+    f[i + 1] = Math.min(lim[i + 1], Math.sqrt(Math.max(v * v + 2 * a * DS, 0)));
+  }
+  b[n - 1] = lim[n - 1];
+  for (let i = n - 1; i > 0; i--) {
+    const v = b[i], a = (brakeLimit(p, v) * ell(v, R[i]) + resist(p, v)) / p.m;
+    b[i - 1] = Math.min(lim[i - 1], Math.sqrt(v * v + 2 * a * DS));
+  }
+  let t = 0;
+  const vs = f.map((v, i) => Math.min(v, b[i])), tr = [];
+  for (let i = 0; i < n - 1; i++) t += vs[i] + vs[i + 1] > 0 ? 2 * DS / (vs[i] + vs[i + 1]) : Infinity;
+  for (let i = 0; i < n; i += 4) tr.push({ x: i * DS, y: vs[i] * 3.6 });
+  return { t, dist: (n - 1) * DS, tr };
+}
+
+function simulate(p) {
+  const vTop = topSpeed(p), acc = accelRun(p), lap = lapSim(p, vTop);
+  const vs = vCorner(p, SKID_R), aY = vs * vs / SKID_R;
+  const Fb = brakeLimit(p, vTop), W = p.m * G0, llt = Fb * p.h / p.L;
+  return {
+    acc: acc.t, skid: 2 * Math.PI * SKID_R / vs, skidG: aY / G0, lap: lap.t, avg: lap.dist / lap.t * 3.6,
+    vtop: vTop * 3.6, pw: (p.type === 'EV' ? p.evP : p.cvP) / p.m, accG: acc.aMax / G0,
+    brkG: (Fb + resist(p, vTop)) / W, llt, lltPct: llt / W * 100, latLT: p.m * aY * p.h / p.tw,
+    lapTrace: lap.tr, accTrace: acc.tr, dist: lap.dist,
+  };
+}
+</script>
+
+<script>
+const OUT = [ // [label, key, unit, better: -1 lower, 1 higher, 0 neutral, decimals]
+  ['Acceleration 75 m', 'acc', 's', -1, 3], ['Skidpad lap', 'skid', 's', -1, 3], ['Skidpad lateral', 'skidG', 'g', 1, 2],
+  ['Autocross lap', 'lap', 's', -1, 2], ['Autocross avg speed', 'avg', 'km/h', 1, 1], ['Top speed', 'vtop', 'km/h', 1, 1],
+  ['Power-to-weight', 'pw', 'kW/kg', 1, 3], ['Peak accel', 'accG', 'g', 1, 2], ['Peak braking (at top speed)', 'brkG', 'g', 1, 2],
+  ['Long. load transfer, peak braking', 'llt', 'N', 0, 0], ['Long. load transfer, % of weight', 'lltPct', '%', 0, 1],
+  ['Lateral load transfer, skidpad', 'latLT', 'N', 0, 0],
+];
+const CFG = ['A', 'B'], STORE = 'fsLapSim1', $ = id => document.getElementById(id);
+const sel = (c, k, opts) => `<label class="row"><span>${k === 'type' ? 'Powertrain type' : 'Drive'}</span>
+  <select id="${c}_${k}">${opts.map(o => `<option>${o}</option>`).join('')}</select><small></small></label>`;
+
+function buildForm(c) {
+  let h = sel(c, 'type', ['EV', 'CV']);
+  FIELDS.forEach(f => {
+    if (typeof f === 'string') { h += `<h3>${f.slice(1)}</h3>`; return; }
+    const [k, lab, u, d, , , , , pt] = f;
+    h += `<label class="row"${pt ? ` data-pt="${pt}"` : ''}><span>${lab}${u ? ` (${u})` : ''}</span>
+      <input type="number" step="any" inputmode="decimal" id="${c}_${k}" value="${d}"><small id="${c}_${k}_w"></small></label>`;
+    if (k === 'cvRpmLim') h += `<label class="row" data-pt="CV"><span>Gear ratios (comma list)</span>
+      <input type="text" id="${c}_gears" value="${DEF_GEARS}"><small id="${c}_gears_w"></small></label>`;
+    if (k === 'r') h += sel(c, 'drive', ['RWD', 'AWD']);
+  });
+  $('cfg' + c).querySelector('.form').innerHTML = h;
+}
+
+function showPt(c) {
+  const t = $(c + '_type').value;
+  $('cfg' + c).querySelectorAll('[data-pt]').forEach(el => { el.style.display = el.dataset.pt === t ? '' : 'none'; });
+  const awd = $(c + '_drive').querySelector('option:last-child');
+  awd.disabled = awd.hidden = t === 'CV';
+  if (t === 'CV') $(c + '_drive').value = 'RWD';
+}
+
+// Read and validate one config: invalid -> default, clamp to hard range, warn outside typical range.
+function read(c) {
+  const p = { type: $(c + '_type').value, drive: $(c + '_drive').value };
+  FIELDS.forEach(f => {
+    if (typeof f === 'string') return;
+    const [k, , , d, lo, hi, tlo, thi] = f, raw = parseFloat($(`${c}_${k}`).value);
+    let v = raw, w = '';
+    if (!isFinite(raw)) { v = k === 'm' ? DEF_MASS[p.type] : d; w = `Invalid, using ${v}`; }
+    else if (raw < lo || raw > hi) { v = Math.min(hi, Math.max(lo, raw)); w = `Out of range, clamped to ${v}`; }
+    else if (raw < tlo || raw > thi) w = `Outside typical range (${tlo} to ${thi})`;
+    p[k] = v; $(`${c}_${k}_w`).textContent = w;
+  });
+  if (p.cvRpmLim <= p.cvRpmPk) { p.cvRpmLim = p.cvRpmPk + 1; $(c + '_cvRpmLim_w').textContent = 'Must exceed peak power rpm'; }
+  const g = $(c + '_gears').value.split(',').map(parseFloat).filter(x => isFinite(x) && x > 0 && x < 10);
+  p.gears = g.length ? g.slice(0, 8) : DEF_GEARS.split(',').map(Number);
+  $(c + '_gears_w').textContent = g.length ? '' : 'Invalid list, using default';
+  return p;
+}
+
+let charts = null;
+function mkChart(id, xt) {
+  const ds = (l, col) => ({ label: l, data: [], borderColor: col, backgroundColor: col, borderWidth: 2, pointRadius: 0, tension: 0 });
+  const ax = t => ({ type: 'linear', title: { display: true, text: t, color: '#9aa4b2' }, ticks: { color: '#9aa4b2' }, grid: { color: '#2a313b' } });
+  return new Chart($(id), {
+    type: 'line', data: { datasets: [ds('A', '#3fb8ff'), ds('B', '#ff8a3d')] },
+    options: { animation: false, maintainAspectRatio: false, interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      plugins: { legend: { labels: { color: '#e8eaed' } } }, scales: { x: ax(xt), y: ax('Speed (km/h)') } },
+  });
+}
+
+function update() {
+  const ps = CFG.map(read), r = ps.map(simulate);
+  $('res').innerHTML = OUT.map(([lab, k, u, dir, dp]) => {
+    const fmt = v => isFinite(v) ? v.toFixed(dp) : 'No launch';
+    const d = r[1][k] - r[0][k], ok = isFinite(d);
+    const cls = ok && dir && Math.abs(d) > 0.5 * 10 ** -dp ? (d * dir > 0 ? 'good' : 'bad') : '';
+    return `<tr><td>${lab} (${u})</td><td>${fmt(r[0][k])}</td><td>${fmt(r[1][k])}</td>
+      <td class="${cls}">${ok ? (d > 0 ? '+' : '') + d.toFixed(dp) : 'n/a'}</td></tr>`;
+  }).join('');
+  $('trackInfo').textContent = `Autocross track: generic ${r[0].dist.toFixed(0)} m layout, standing start. Skidpad radius ${SKID_R} m.`;
+  if (window.Chart) {
+    charts = charts || [mkChart('lapChart', 'Distance (m)'), mkChart('accChart', 'Time (s)')];
+    r.forEach((x, i) => { charts[0].data.datasets[i].data = x.lapTrace; charts[1].data.datasets[i].data = x.accTrace; });
+    charts.forEach(ch => ch.update());
+  }
+  try {
+    const s = {};
+    document.querySelectorAll('.form input, .form select').forEach(el => { s[el.id] = el.value; });
+    localStorage.setItem(STORE, JSON.stringify(s));
+  } catch (e) { /* storage unavailable */ }
+}
+
+let pending = false;
+const schedule = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; update(); }); } };
+
+CFG.forEach(buildForm);
+try {
+  const s = JSON.parse(localStorage.getItem(STORE) || '{}');
+  Object.keys(s).forEach(id => { if ($(id)) $(id).value = s[id]; });
+} catch (e) { /* ignore bad storage */ }
+CFG.forEach(showPt);
+
+document.addEventListener('input', e => {
+  const m = /^([AB])_type$/.exec(e.target.id);
+  if (m) { $(m[1] + '_m').value = DEF_MASS[e.target.value]; showPt(m[1]); }
+  schedule();
+});
+document.addEventListener('change', schedule);
+$('copy').addEventListener('click', () => {
+  $('cfgA').querySelectorAll('input, select').forEach(el => { $('B' + el.id.slice(1)).value = el.value; });
+  showPt('B'); update();
+});
+update();
+</script>
+</body>
+</html>
