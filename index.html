@@ -4,58 +4,133 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FS Lap-Sim Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-:root{--bg:#0d0f12;--card:#161a20;--line:#2a313b;--txt:#e8eaed;--mut:#9aa4b2;--a:#3fb8ff;--b:#ff8a3d;--good:#3ddc84;--bad:#ff5c5c;--warn:#ffcc4d;--red:#e10600}
+:root{--bg:#0b0d10;--card:#14181e;--card2:#1a1f27;--line:#262d37;--txt:#e8eaed;--mut:#8f9aa8;--a:#1aa0e0;--b:#e86a1c;--good:#3ddc84;--bad:#ff5c5c;--warn:#ffcc4d;--red:#e10600;--acc:var(--a);--mono:'JetBrains Mono',ui-monospace,monospace}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-header{padding:14px 16px;border-bottom:3px solid var(--red);background:#11141a}
-h1{margin:0;font-size:20px;letter-spacing:.5px;text-transform:uppercase}
-.note{margin:4px 0 0;color:var(--mut);font-size:12px}
-main{max-width:1200px;margin:0 auto;padding:12px}
-.cfgs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
-.card h2{margin:0 0 8px;font-size:15px;text-transform:uppercase;letter-spacing:.5px}
-#cfgA h2{color:var(--a)} #cfgB h2{color:var(--b)}
-h3{margin:10px 0 4px;font-size:12px;color:var(--mut);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:2px}
-label.row{display:grid;grid-template-columns:1fr 120px;gap:6px;align-items:center;padding:2px 0}
-label.row small{grid-column:1/-1;color:var(--warn);font-size:11px}
-label.row small:empty{display:none}
-input,select{width:100%;background:#0f1216;color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:5px 6px;font:inherit}
-input:focus,select:focus{outline:2px solid var(--a);outline-offset:-1px}
-.bar{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}
-button{background:var(--red);color:#fff;border:0;border-radius:4px;padding:8px 14px;font:600 13px system-ui;cursor:pointer}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
-th:first-child,td:first-child{text-align:left}
-th{color:var(--mut);font-size:12px;text-transform:uppercase}
-th.a{color:var(--a)} th.b{color:var(--b)}
-td.good{color:var(--good);font-weight:600} td.bad{color:var(--bad);font-weight:600}
-.charts{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}
-.cw{position:relative;height:300px}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.top{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(14,17,21,.92);backdrop-filter:blur(8px);border-bottom:2px solid var(--red)}
+.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.6px;text-transform:uppercase}
+h1 b{color:var(--red)}
+.badge{font-size:11px;color:var(--warn);border:1px solid #5a4a1a;background:#2a2410;border-radius:99px;padding:2px 9px;white-space:nowrap}
+.acts{display:flex;gap:6px}
+button{display:inline-flex;align-items:center;gap:6px;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:7px 11px;font:600 12px Inter,system-ui;cursor:pointer}
+button:hover{border-color:#3a4452;background:#20262f}
+main{max-width:1440px;margin:0 auto;padding:14px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.kpi{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kl{display:flex;align-items:center;gap:7px;color:var(--mut);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.kmain{display:flex;align-items:baseline;gap:6px;margin:6px 0 8px}
+.va{font:700 30px/1 var(--mono);letter-spacing:-1px}
+.u{color:var(--mut);font-size:13px}
+.kfoot{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:13px;flex-wrap:wrap}
+.vb{font:500 14px var(--mono)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;background:var(--a)}
+.sw.b{background:var(--b)}
+.chip{display:inline-flex;align-items:center;gap:3px;font:600 12px var(--mono);border-radius:99px;padding:2px 8px;background:#222831;color:var(--mut)}
+.chip.good{background:rgba(61,220,132,.13);color:var(--good)} .chip.bad{background:rgba(255,92,92,.13);color:var(--bad)}
+.chip svg{width:12px;height:12px;fill:currentColor}
+.fl{animation:fl .5s ease}
+@keyframes fl{from{opacity:.35}to{opacity:1}}
+.layout{display:grid;grid-template-columns:370px minmax(0,1fr);gap:14px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.card h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#c9d0d9}
+.panel{position:sticky;top:64px;max-height:calc(100vh - 78px);overflow:auto;padding:0;border-top:3px solid var(--acc)}
+.ptop{position:sticky;top:0;z-index:2;background:var(--card);padding:12px 14px 10px;border-bottom:1px solid var(--line);display:grid;gap:8px}
+.seg{display:flex;background:#0f1216;border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px}
+.seg button{flex:1;justify-content:center;border:0;background:transparent;color:var(--mut);padding:6px 8px;position:relative}
+.seg button.on{background:#262d37;color:var(--txt)}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+#cfgSeg button[data-v=A].on{background:var(--a);color:#06141c} #cfgSeg button[data-v=B].on{background:var(--b);color:#1c0c02}
+.nd{font-size:10px;background:#0b0d10;color:var(--txt);border-radius:99px;padding:0 6px}
+select,input{background:#0f1216;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;width:100%}
+input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
+details.sec{border-bottom:1px solid var(--line)}
+details.sec summary{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#c9d0d9;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:'';margin-left:auto;width:7px;height:7px;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(45deg);transition:transform .15s}
+details[open] summary::after{transform:rotate(225deg)}
+details.sec summary svg{color:var(--acc)}
+.body{padding:0 14px 10px;display:grid;gap:10px}
+.fld{display:grid;gap:3px}
+.flt{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+.flt label{color:#c5ccd5;display:flex;align-items:center;gap:6px}
+.nb{display:flex;align-items:center;gap:4px;flex:none}
+.nb input{width:84px;padding:3px 6px;text-align:right;font:500 13px var(--mono)}
+.nb em{font-style:normal;color:var(--mut);font-size:11px;min-width:26px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--b);display:none;flex:none}
+.dot.on{display:inline-block}
+.warn{color:var(--warn);font-size:11px;display:flex;gap:4px;align-items:center}
+.warn:empty{display:none}
+.fld.w .nb input{border-color:var(--warn)}
+input[type=range]{-webkit-appearance:none;appearance:none;height:18px;padding:0;border:0;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,#2a313b var(--lo),#3d4756 var(--lo),#3d4756 var(--hi),#2a313b var(--hi))}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:linear-gradient(90deg,#2a313b var(--lo),#3d4756 var(--lo),#3d4756 var(--hi),#2a313b var(--hi))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;margin-top:-5.5px;border-radius:50%;background:var(--acc);border:2px solid #0b0d10;box-shadow:0 0 0 1px var(--acc)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--acc);border:2px solid #0b0d10}
+.viz{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;min-width:0}
+.wide{grid-column:1/-1}
+.cw{position:relative;height:280px}
+.cw.sq{height:300px}
+#map{width:100%;display:block;cursor:crosshair}
+.mapw{position:relative}
+.tip{position:absolute;pointer-events:none;background:#0b0d10;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:500 12px var(--mono);white-space:nowrap;display:none;transform:translateY(-130%)}
+.legend{display:flex;align-items:center;gap:8px;font:500 11px var(--mono);color:var(--mut);margin-top:6px}
+.ramp{flex:0 1 220px;height:8px;border-radius:4px}
+.tag{font-size:11px;border-radius:5px;padding:1px 7px;color:#0b0d10;background:var(--acc)}
 .mut{color:var(--mut);font-size:12px}
-@media (max-width:760px){.cfgs,.charts{grid-template-columns:1fr} label.row{grid-template-columns:1fr 100px} .cw{height:240px} th,td{padding:5px 4px;font-size:13px}}
+#loads{width:100%;height:auto;display:block}
+details.all{margin-top:14px}
+details.all summary{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.5px;list-style:none}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:10px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right}
+td{font-family:var(--mono);font-size:13px}
+th:first-child,td:first-child{text-align:left;font-family:inherit}
+th{color:var(--mut);font-size:11px;text-transform:uppercase}
+td.good{color:var(--good);font-weight:700} td.bad{color:var(--bad);font-weight:700}
+@media (max-width:1080px){.layout{grid-template-columns:minmax(0,1fr)}.panel{position:static;max-height:none}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){main{padding:10px}.viz{grid-template-columns:minmax(0,1fr)}.top{padding:8px 10px}.acts{width:100%}.acts button{flex:1;justify-content:center;padding:7px 4px}
+ .kpis{gap:8px}.kpi{padding:10px}.va{font-size:22px}.cw{height:230px}.cw.sq{height:280px}th,td{padding:5px 4px;font-size:12px}}
 </style>
 </head>
 <body>
-<header>
-<h1>FS Lap-Sim Dashboard</h1>
-<p class="note">Simulated estimates from a point-mass model, not measured telemetry.</p>
+<header class="top">
+<div class="brand"><h1><b>FS</b> Lap-Sim</h1><span class="badge">Simulated estimates, not telemetry</span></div>
+<div class="acts">
+<button id="reset" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Reset</button>
+<button id="copy" type="button"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>Copy A to B</button>
+<button id="swap" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>Swap A/B</button>
+</div>
 </header>
 <main>
-<div class="cfgs">
-<section class="card" id="cfgA"><h2>Baseline (A)</h2><div class="form"></div></section>
-<section class="card" id="cfgB"><h2>Modified (B)</h2><div class="form"></div></section>
+<section class="kpis" id="kpis"></section>
+<div class="layout">
+<aside class="card panel" id="panel">
+<div class="ptop">
+<div class="seg" id="cfgSeg" data-g="cfg"><button type="button" data-v="A">A &middot; Baseline</button><button type="button" data-v="B">B &middot; Modified <span class="nd" id="ndiff"></span></button></div>
+<select id="preset" aria-label="Presets"><option value="">Apply preset to selected config...</option><option>Typical EV</option><option>Typical CV</option><option>High downforce</option><option>Low drag</option></select>
 </div>
-<div class="bar"><button id="copy" type="button">Copy A to B</button><span class="mut">Results update live on any change.</span></div>
-<section class="card"><h2>Results</h2>
-<table><thead><tr><th>Output</th><th class="a">A</th><th class="b">B</th><th>Delta (B minus A)</th></tr></thead><tbody id="res"></tbody></table>
-</section>
-<div class="charts">
-<section class="card"><h2>Autocross: speed vs distance</h2><div class="cw"><canvas id="lapChart"></canvas></div></section>
+<div id="form"></div>
+</aside>
+<div class="viz">
+<section class="card wide"><h2>Track map: speed heatmap <span class="tag" id="mapTag">A</span></h2>
+<div class="mapw"><canvas id="map"></canvas><div class="tip" id="tip"></div></div>
+<div class="legend"><span id="lo"></span><span class="ramp" id="ramp"></span><span id="hi"></span><span>km/h (A/B shared)</span></div></section>
+<section class="card wide"><h2>Autocross: speed vs distance</h2><div class="cw"><canvas id="lapChart"></canvas></div></section>
 <section class="card"><h2>Acceleration: speed vs time</h2><div class="cw"><canvas id="accChart"></canvas></div></section>
+<section class="card"><h2>G-G diagram (autocross lap)</h2><div class="cw sq"><canvas id="ggChart"></canvas></div></section>
+<section class="card"><h2>A vs B radar (best = 1)</h2><div class="cw sq"><canvas id="radar"></canvas></div></section>
+<section class="card"><h2>Wheel loads (N) <span class="tag" id="ldTag">A</span></h2><svg id="loads" viewBox="0 0 340 250"></svg>
+<p class="mut">Circle area scales with load. Skidpad shown in a left turn. Includes aero at that speed.</p></section>
 </div>
-<p class="mut" id="trackInfo"></p>
+</div>
+<details class="card all"><summary><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>All outputs</summary>
+<table><thead><tr><th>Output</th><th><i class="sw"></i>A</th><th><i class="sw b"></i>B</th><th>B minus A</th></tr></thead><tbody id="res"></tbody></table>
+<p class="mut" id="trackInfo"></p></details>
 </main>
 
 <script id="phys">
@@ -225,7 +300,17 @@ function lapSim(p, vTop) {
   const vs = f.map((v, i) => Math.min(v, b[i])), tr = [];
   for (let i = 0; i < n - 1; i++) t += vs[i] + vs[i + 1] > 0 ? 2 * DS / (vs[i] + vs[i + 1]) : Infinity;
   for (let i = 0; i < n; i += 4) tr.push({ x: i * DS, y: vs[i] * 3.6 });
-  return { t, dist: (n - 1) * DS, tr };
+  return { t, dist: (n - 1) * DS, tr, vs };
+}
+
+// Extra UI data: wheel loads (N) [FL, FR, RL, RR] at peak braking and at skidpad (left turn, outer = right).
+// Lateral transfer is split between axles by their static-plus-aero load share.
+function wheelLoads(p, vTop, llt, vs, aY) {
+  const W = p.m * G0, Df = downforce(p, vTop), Ds = downforce(p, vs);
+  const Bf = W * p.wf / 100 + Df * p.ab / 100, Br = W + Df - Bf;
+  const Sf = W * p.wf / 100 + Ds * p.ab / 100, Sr = W + Ds - Sf, lat = p.m * aY * p.h / p.tw, kf = Sf / (Sf + Sr);
+  return { brk: [(Bf + llt) / 2, (Bf + llt) / 2, (Br - llt) / 2, (Br - llt) / 2],
+    skid: [Sf / 2 - lat * kf, Sf / 2 + lat * kf, Sr / 2 - lat * (1 - kf), Sr / 2 + lat * (1 - kf)] };
 }
 
 function simulate(p) {
@@ -236,7 +321,7 @@ function simulate(p) {
     acc: acc.t, skid: 2 * Math.PI * SKID_R / vs, skidG: aY / G0, lap: lap.t, avg: lap.dist / lap.t * 3.6,
     vtop: vTop * 3.6, pw: (p.type === 'EV' ? p.evP : p.cvP) / p.m, accG: acc.aMax / G0,
     brkG: (Fb + resist(p, vTop)) / W, llt, lltPct: llt / W * 100, latLT: p.m * aY * p.h / p.tw,
-    lapTrace: lap.tr, accTrace: acc.tr, dist: lap.dist,
+    lapTrace: lap.tr, accTrace: acc.tr, dist: lap.dist, lapV: lap.vs, wheels: wheelLoads(p, vTop, llt, vs, aY),
   };
 }
 </script>
@@ -249,105 +334,262 @@ const OUT = [ // [label, key, unit, better: -1 lower, 1 higher, 0 neutral, decim
   ['Long. load transfer, peak braking', 'llt', 'N', 0, 0], ['Long. load transfer, % of weight', 'lltPct', '%', 0, 1],
   ['Lateral load transfer, skidpad', 'latLT', 'N', 0, 0],
 ];
-const CFG = ['A', 'B'], STORE = 'fsLapSim1', $ = id => document.getElementById(id);
-const sel = (c, k, opts) => `<label class="row"><span>${k === 'type' ? 'Powertrain type' : 'Drive'}</span>
-  <select id="${c}_${k}">${opts.map(o => `<option>${o}</option>`).join('')}</select><small></small></label>`;
-
-function buildForm(c) {
-  let h = sel(c, 'type', ['EV', 'CV']);
-  FIELDS.forEach(f => {
-    if (typeof f === 'string') { h += `<h3>${f.slice(1)}</h3>`; return; }
-    const [k, lab, u, d, , , , , pt] = f;
-    h += `<label class="row"${pt ? ` data-pt="${pt}"` : ''}><span>${lab}${u ? ` (${u})` : ''}</span>
-      <input type="number" step="any" inputmode="decimal" id="${c}_${k}" value="${d}"><small id="${c}_${k}_w"></small></label>`;
-    if (k === 'cvRpmLim') h += `<label class="row" data-pt="CV"><span>Gear ratios (comma list)</span>
-      <input type="text" id="${c}_gears" value="${DEF_GEARS}"><small id="${c}_gears_w"></small></label>`;
-    if (k === 'r') h += sel(c, 'drive', ['RWD', 'AWD']);
-  });
-  $('cfg' + c).querySelector('.form').innerHTML = h;
-}
-
-function showPt(c) {
-  const t = $(c + '_type').value;
-  $('cfg' + c).querySelectorAll('[data-pt]').forEach(el => { el.style.display = el.dataset.pt === t ? '' : 'none'; });
-  const awd = $(c + '_drive').querySelector('option:last-child');
-  awd.disabled = awd.hidden = t === 'CV';
-  if (t === 'CV') $(c + '_drive').value = 'RWD';
-}
+const SV = d => `<svg class="i" viewBox="0 0 24 24">${d}</svg>`;
+const IC = {
+  Powertrain: SV('<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'), Chassis: SV('<path d="M3 15h18l-2-6H5z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>'),
+  Tyres: SV('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>'), Aero: SV('<path d="M2 10c6-4 14-4 20 0M5 14h14M12 10v8"/>'),
+  Brakes: SV('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1"/><path d="M16 5a9 9 0 0 1 3 4"/>'),
+  acc: SV('<path d="M4 20 20 4M9 4h11v11"/>'), skid: SV('<circle cx="7" cy="12" r="5"/><circle cx="17" cy="12" r="5"/>'),
+  lap: SV('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>'), vtop: SV('<path d="M4 18a8 8 0 1 1 16 0M12 18l4-6"/>'),
+  warn: '<svg class="i" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M12 3 2 21h20zM12 10v5M12 18v.5"/></svg>',
+};
+const KPI = [['Accel 75 m', 'acc', 's', -1, 3], ['Skidpad', 'skid', 's', -1, 3], ['Autocross lap', 'lap', 's', -1, 2], ['Top speed', 'vtop', 'km/h', 1, 1]];
+const CFG = ['A', 'B'], STORE = 'fsLapSim2', $ = id => document.getElementById(id), COL = { A: '#1aa0e0', B: '#e86a1c' };
+const FLD = FIELDS.filter(Array.isArray);
+const STEP = { ClA: .1, CdA: .05, evG: .1, cvFin: .05, L: .005, r: .005, muX: .05, muY: .05, wf: .5, evRpm: 100, cvRpmPk: 100, cvRpmLim: 100 };
+const stepOf = f => STEP[f[0]] || 10 ** -((String(f[3]).split('.')[1] || '').length);
+const rawDef = t => { const p = { type: t, drive: 'RWD', gears: DEF_GEARS }; FLD.forEach(f => { p[f[0]] = f[3]; }); p.m = DEF_MASS[t]; return p; };
+let S = { A: rawDef('EV'), B: rawDef('EV') }, cur = 'A', last = null;
 
 // Read and validate one config: invalid -> default, clamp to hard range, warn outside typical range.
 function read(c) {
-  const p = { type: $(c + '_type').value, drive: $(c + '_drive').value };
-  FIELDS.forEach(f => {
-    if (typeof f === 'string') return;
-    const [k, , , d, lo, hi, tlo, thi] = f, raw = parseFloat($(`${c}_${k}`).value);
-    let v = raw, w = '';
-    if (!isFinite(raw)) { v = k === 'm' ? DEF_MASS[p.type] : d; w = `Invalid, using ${v}`; }
-    else if (raw < lo || raw > hi) { v = Math.min(hi, Math.max(lo, raw)); w = `Out of range, clamped to ${v}`; }
-    else if (raw < tlo || raw > thi) w = `Outside typical range (${tlo} to ${thi})`;
-    p[k] = v; $(`${c}_${k}_w`).textContent = w;
+  const s = S[c], p = { type: s.type, drive: s.type === 'CV' ? 'RWD' : s.drive }, w = {};
+  FLD.forEach(([k, , , d, lo, hi, tlo, thi]) => {
+    const raw = parseFloat(s[k]); let v = raw;
+    if (!isFinite(raw)) { v = k === 'm' ? DEF_MASS[p.type] : d; w[k] = `Invalid, using ${v}`; }
+    else if (raw < lo || raw > hi) { v = Math.min(hi, Math.max(lo, raw)); w[k] = `Out of range, clamped to ${v}`; }
+    else if (raw < tlo || raw > thi) w[k] = `Outside typical range (${tlo} to ${thi})`;
+    p[k] = v;
   });
-  if (p.cvRpmLim <= p.cvRpmPk) { p.cvRpmLim = p.cvRpmPk + 1; $(c + '_cvRpmLim_w').textContent = 'Must exceed peak power rpm'; }
-  const g = $(c + '_gears').value.split(',').map(parseFloat).filter(x => isFinite(x) && x > 0 && x < 10);
+  if (p.cvRpmLim <= p.cvRpmPk) { p.cvRpmLim = p.cvRpmPk + 1; w.cvRpmLim = 'Must exceed peak power rpm'; }
+  const all = String(s.gears).split(',').map(parseFloat), g = all.filter(x => isFinite(x) && x > 0 && x < 10);
   p.gears = g.length ? g.slice(0, 8) : DEF_GEARS.split(',').map(Number);
-  $(c + '_gears_w').textContent = g.length ? '' : 'Invalid list, using default';
-  return p;
+  if (!g.length) w.gears = 'Invalid list, using default';
+  else if (g.length < all.length || g.length > 8) w.gears = 'Some entries ignored (need 0 < ratio < 10, max 8)';
+  return { p, w };
+}
+
+// Track geometry: turn direction per segment (chosen offline for a compact, non-crossing layout).
+const TURN = '1,-1,1,1,-1,1,-1,1,1,-1,1,-1,1,1,-1,1,-1,1,1,1,-1,1,-1,1,1,1,-1,1,1,-1,1,-1,1,1'.split(',').map(Number);
+const SG = [], GEO = (() => {
+  let x = 0, y = 0, h = 0; const P = [[0, 0]];
+  TRACK.forEach((s, i) => {
+    const st = s.length === 1, n = Math.round((st ? s[0] : s[0] * s[1] * Math.PI / 180) / DS);
+    for (let j = 0; j < n; j++) { SG.push(st ? 0 : TURN[i]); if (!st) h += TURN[i] * DS / s[0]; x += DS * Math.cos(h); y += DS * Math.sin(h); P.push([x, y]); }
+  });
+  SG.push(0);
+  return P;
+})();
+const BB = (() => { const xs = GEO.map(p => p[0]), ys = GEO.map(p => p[1]), x0 = Math.min(...xs), y1 = Math.max(...ys);
+  return { x0, y1, w: Math.max(...xs) - x0, h: y1 - Math.min(...ys) }; })();
+const RAMP = ['#4a1486', '#8c2981', '#de4968', '#fe9f6d', '#fcfdbf'].map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)));
+function ramp(t) {
+  t = Math.min(Math.max(t, 0), 1) * (RAMP.length - 1); const i = Math.min(Math.floor(t), RAMP.length - 2), f = t - i;
+  return `rgb(${RAMP[i].map((c, j) => Math.round(c + (RAMP[i + 1][j] - c) * f)).join(',')})`;
+}
+$('ramp').style.background = `linear-gradient(90deg,${[0, .25, .5, .75, 1].map(ramp).join(',')})`;
+
+// ---------- Form ----------
+function buildForm() {
+  let h = '', open = false;
+  const sec = n => { h += `${open ? '</div></details>' : ''}<details class="sec"${n === 'Powertrain' || innerWidth > 1080 ? ' open' : ''}><summary>${IC[n]}${n}</summary><div class="body">`; open = true; };
+  const seg = (g, vs) => `<div class="fld"><div class="flt"><label>${g === 'type' ? 'Powertrain type' : 'Drive'}<i class="dot" id="d_${g}"></i></label></div>
+    <div class="seg" data-g="${g}">${vs.map(v => `<button type="button" data-v="${v}">${v}</button>`).join('')}</div></div>`;
+  FIELDS.forEach(f => {
+    if (typeof f === 'string') { sec(f.slice(1).split(' ')[0]); if (f === '#Powertrain') h += seg('type', ['EV', 'CV']) + seg('drive', ['RWD', 'AWD']); return; }
+    const [k, lab, u, , lo, hi, tlo, thi, pt] = f, pc = v => ((v - lo) / (hi - lo) * 100).toFixed(1) + '%';
+    h += `<div class="fld" id="x_${k}"${pt ? ` data-pt="${pt}"` : ''}><div class="flt"><label for="f_${k}">${lab}<i class="dot" id="d_${k}"></i></label>
+      <span class="nb"><input type="number" step="any" inputmode="decimal" id="f_${k}" data-k="${k}"><em>${u}</em></span></div>
+      <input type="range" id="s_${k}" data-k="${k}" min="${lo}" max="${hi}" step="${stepOf(f)}" style="--lo:${pc(tlo)};--hi:${pc(thi)}" aria-label="${lab}">
+      <small class="warn" id="w_${k}"></small></div>`;
+    if (k === 'cvRpmLim') h += `<div class="fld" id="x_gears" data-pt="CV"><div class="flt"><label for="f_gears">Gear ratios (comma list)<i class="dot" id="d_gears"></i></label></div>
+      <input type="text" id="f_gears" data-k="gears"><small class="warn" id="w_gears"></small></div>`;
+  });
+  $('form').innerHTML = h + '</div></details>';
+}
+
+function fillForm() {
+  const s = S[cur];
+  document.documentElement.style.setProperty('--acc', COL[cur]);
+  FLD.forEach(([k]) => { $('f_' + k).value = s[k]; $('s_' + k).value = s[k]; });
+  $('f_gears').value = s.gears;
+  document.querySelectorAll('#form [data-pt]').forEach(el => { el.style.display = el.dataset.pt === s.type ? '' : 'none'; });
+  document.querySelectorAll('.seg').forEach(g => {
+    const v = { cfg: cur, type: s.type, drive: s.type === 'CV' ? 'RWD' : s.drive }[g.dataset.g];
+    g.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === v); b.disabled = b.dataset.v === 'AWD' && s.type === 'CV'; });
+  });
+  $('mapTag').textContent = $('ldTag').textContent = cur;
+}
+
+// ---------- Visuals ----------
+const fmt = (v, dp) => isFinite(v) ? v.toFixed(dp) : 'No launch';
+const arrow = up => `<svg viewBox="0 0 12 12"><path d="${up ? 'M6 2 11 9H1z' : 'M6 10 1 3h10z'}"/></svg>`;
+function setT(el, t) { if (el.textContent !== t) { el.textContent = t; el.classList.remove('fl'); void el.offsetWidth; el.classList.add('fl'); } }
+$('kpis').innerHTML = KPI.map(([lab, k, u]) => `<div class="kpi" id="k_${k}"><div class="kl">${IC[k]}${lab}</div>
+  <div class="kmain"><i class="sw"></i><span class="va"></span><span class="u">${u}</span></div>
+  <div class="kfoot"><span><i class="sw b"></i>B <b class="vb"></b></span><span class="chip"></span></div></div>`).join('');
+
+function kpis(r) {
+  KPI.forEach(([, k, u, dir, dp]) => {
+    const el = $('k_' + k), a = r[0][k], b = r[1][k], d = b - a, chip = el.querySelector('.chip');
+    setT(el.querySelector('.va'), fmt(a, dp)); setT(el.querySelector('.vb'), fmt(b, dp));
+    let cls = 'neu', txt = isFinite(d) ? 'same' : 'n/a';
+    if (isFinite(d) && Math.abs(d) > 0.5 * 10 ** -dp) { cls = d * dir > 0 ? 'good' : 'bad'; txt = arrow(d > 0) + (d > 0 ? '+' : '') + d.toFixed(dp) + ' ' + u; }
+    chip.className = 'chip ' + cls; chip.innerHTML = txt;
+    chip.title = cls === 'neu' ? '' : `B is ${cls === 'good' ? 'better' : 'worse'} than A (${dir < 0 ? 'lower' : 'higher'} is better)`;
+  });
+}
+
+let MAPXY = [];
+function drawMap() {
+  if (!last) return;
+  const cv = $('map'), W = cv.clientWidth, H = Math.round(Math.min(Math.max(W * 0.5, 210), 360)), dpr = devicePixelRatio || 1;
+  cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr;
+  const x = cv.getContext('2d'), pad = 18, sc = Math.min((W - 2 * pad) / BB.w, (H - 2 * pad) / BB.h);
+  const ox = (W - BB.w * sc) / 2, oy = (H - BB.h * sc) / 2;
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  MAPXY = GEO.map(p => [ox + (p[0] - BB.x0) * sc, oy + (BB.y1 - p[1]) * sc]);
+  x.lineCap = x.lineJoin = 'round';
+  x.strokeStyle = '#232a33'; x.lineWidth = 12; x.beginPath(); MAPXY.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.stroke();
+  const v = last[CFG.indexOf(cur)].lapV, all = last.flatMap(r => r.lapV.slice(40)), lo = Math.min(...all), hi = Math.max(...all);
+  x.lineWidth = 5;
+  for (let i = 0; i < v.length - 1; i += 2) {
+    const j = Math.min(i + 2, v.length - 1);
+    x.strokeStyle = ramp(((v[i] + v[j]) / 2 - lo) / (hi - lo || 1)); x.beginPath(); x.moveTo(...MAPXY[i]); x.lineTo(...MAPXY[j]); x.stroke();
+  }
+  const mark = ([a, b], t, c) => { x.fillStyle = c; x.beginPath(); x.arc(a, b, 5, 0, 7); x.fill(); x.strokeStyle = '#0b0d10'; x.lineWidth = 2; x.stroke();
+    x.fillStyle = '#e8eaed'; x.font = '600 11px Inter,system-ui'; x.fillText(t, a + 8, b - 7); };
+  mark(MAPXY[0], 'Start', '#3ddc84'); mark(MAPXY[MAPXY.length - 1], 'Finish', '#e8eaed');
+  $('lo').textContent = (lo * 3.6).toFixed(0); $('hi').textContent = (hi * 3.6).toFixed(0);
+}
+$('map').addEventListener('pointermove', e => {
+  if (!last || !MAPXY.length) return;
+  const b = e.target.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
+  let bi = 0, bd = 1e9;
+  for (let i = 0; i < MAPXY.length; i += 2) { const d = (MAPXY[i][0] - mx) ** 2 + (MAPXY[i][1] - my) ** 2; if (d < bd) { bd = d; bi = i; } }
+  const t = $('tip');
+  if (bd > 600) { t.style.display = 'none'; return; }
+  t.style.display = 'block'; t.style.top = MAPXY[bi][1] + 'px';
+  t.innerHTML = `${(bi * DS).toFixed(0)} m &nbsp;<i class="sw"></i>${(last[0].lapV[bi] * 3.6).toFixed(1)} &nbsp;<i class="sw b"></i>${(last[1].lapV[bi] * 3.6).toFixed(1)} km/h`;
+  t.style.left = Math.max(0, Math.min(MAPXY[bi][0] - t.offsetWidth / 2, b.width - t.offsetWidth)) + 'px'; // keep inside canvas
+});
+$('map').addEventListener('pointerleave', () => { $('tip').style.display = 'none'; });
+
+function loadsSvg(r) {
+  const W = r.wheels, mx = Math.max(...W.brk, ...W.skid, 1), pos = [[-38, -62], [38, -62], [-38, 62], [38, 62]];
+  const car = (ld, cx, title) => {
+    const f = ld[0] + ld[1], t = f + ld[2] + ld[3];
+    let s = `<g transform="translate(${cx},118)"><path d="M-14 -95 L14 -95 L20 -40 L22 70 L-22 70 L-20 -40Z" fill="#1d232c" stroke="#3a4452"/>
+      <rect x="-40" y="-102" width="80" height="9" rx="3" fill="#2a313b"/><rect x="-34" y="78" width="68" height="10" rx="3" fill="#2a313b"/>`;
+    ld.forEach((l, i) => { const rr = 7 + 21 * Math.sqrt(Math.max(l, 0) / mx), [x, y] = pos[i];
+      s += `<circle cx="${x}" cy="${y}" r="${rr.toFixed(1)}" fill="${COL[cur]}" fill-opacity=".3" stroke="${COL[cur]}" stroke-width="2"/>
+        <text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" font-family="JetBrains Mono,monospace" fill="#e8eaed">${l > 0 ? l.toFixed(0) : 'lift'}</text>`; });
+    return s + `<text y="112" text-anchor="middle" font-size="12" font-weight="600" fill="#c9d0d9">${title}</text>
+      <text y="126" text-anchor="middle" font-size="11" fill="#8f9aa8">front ${(f / t * 100).toFixed(0)}% / rear ${(100 - f / t * 100).toFixed(0)}%</text></g>`;
+  };
+  $('loads').innerHTML = car(W.brk, 85, 'Peak braking') + car(W.skid, 255, 'Skidpad');
 }
 
 let charts = null;
-function mkChart(id, xt) {
-  const ds = (l, col) => ({ label: l, data: [], borderColor: col, backgroundColor: col, borderWidth: 2, pointRadius: 0, tension: 0 });
-  const ax = t => ({ type: 'linear', title: { display: true, text: t, color: '#9aa4b2' }, ticks: { color: '#9aa4b2' }, grid: { color: '#2a313b' } });
-  return new Chart($(id), {
-    type: 'line', data: { datasets: [ds('A', '#3fb8ff'), ds('B', '#ff8a3d')] },
-    options: { animation: false, maintainAspectRatio: false, interaction: { mode: 'nearest', axis: 'x', intersect: false },
-      plugins: { legend: { labels: { color: '#e8eaed' } } }, scales: { x: ax(xt), y: ax('Speed (km/h)') } },
+function mkCharts() {
+  Chart.defaults.color = '#8f9aa8'; Chart.defaults.font.family = 'Inter,system-ui,sans-serif'; Chart.defaults.borderColor = '#232a33';
+  const tip = { backgroundColor: '#0b0d10', borderColor: '#262d37', borderWidth: 1, titleColor: '#e8eaed', bodyColor: '#e8eaed', bodyFont: { family: 'JetBrains Mono' }, usePointStyle: true };
+  const leg = { labels: { color: '#e8eaed', usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, boxHeight: 10 } };
+  const ds = (l, extra) => ({ label: l, data: [], borderColor: COL[l], backgroundColor: COL[l], borderWidth: 2, pointRadius: 0, ...extra });
+  const ax = (t, o) => ({ type: 'linear', title: { display: true, text: t }, grid: { color: '#1e242c' }, ...o });
+  const base = (sx, sy) => ({ animation: false, maintainAspectRatio: false, plugins: { legend: leg, tooltip: tip }, scales: { x: sx, y: sy } });
+  const line = (id, xt) => new Chart($(id), { type: 'line', data: { datasets: [ds('A'), ds('B')] },
+    options: { ...base(ax(xt), ax('Speed (km/h)')), interaction: { mode: 'nearest', axis: 'x', intersect: false } } });
+  const sc = l => ds(l, { borderWidth: 0, pointRadius: 2, backgroundColor: COL[l] + '99' });
+  const gl = { grid: { color: c => c.tick.value === 0 ? '#4a5462' : '#1e242c' } };
+  return {
+    lap: line('lapChart', 'Distance (m)'), acc: line('accChart', 'Time (s)'),
+    gg: new Chart($('ggChart'), { type: 'scatter', data: { datasets: [sc('A'), sc('B')] },
+      options: { ...base(ax('Lateral g (+ left)', gl), ax('Longitudinal g', gl)), plugins: { legend: leg, tooltip: { ...tip, callbacks: { label: c => `${c.dataset.label}: lat ${c.parsed.x.toFixed(2)} g, long ${c.parsed.y.toFixed(2)} g` } } } } }),
+    radar: new Chart($('radar'), { type: 'radar', data: { labels: ['Accel', 'Skidpad', 'Lap', 'Top speed', 'Power/weight'],
+      datasets: CFG.map(l => ({ label: l, data: [], borderColor: COL[l], backgroundColor: COL[l] + '26', borderWidth: 2, pointRadius: 3, pointBackgroundColor: COL[l] })) },
+      options: { animation: false, maintainAspectRatio: false, plugins: { legend: leg, tooltip: { ...tip, callbacks: { label: c => `${c.dataset.label}: ${c.raw.toFixed(3)} of best` } } },
+        scales: { r: { max: 1, ticks: { display: false }, grid: { color: '#262d37' }, angleLines: { color: '#262d37' }, pointLabels: { color: '#c9d0d9', font: { size: 12 } } } } } }),
+  };
+}
+const ggPts = r => { const v = r.lapV, o = [];
+  for (let i = 0; i < v.length - 1; i += 3) o.push({ x: isFinite(TRACK_R[i]) ? SG[i] * v[i] * v[i] / TRACK_R[i] / G0 : 0, y: (v[i + 1] ** 2 - v[i] ** 2) / (2 * DS) / G0 });
+  return o; };
+
+function charts_(r) {
+  if (!window.Chart) return;
+  charts = charts || mkCharts();
+  charts.lap.options.scales.x.max = r[0].dist;
+  r.forEach((x, i) => { charts.lap.data.datasets[i].data = x.lapTrace; charts.acc.data.datasets[i].data = x.accTrace; charts.gg.data.datasets[i].data = ggPts(x); });
+  const R = [['acc', -1], ['skid', -1], ['lap', -1], ['vtop', 1], ['pw', 1]].map(([k, d]) => {
+    const v = r.map(x => x[k]), best = d < 0 ? Math.min(...v) : Math.max(...v);
+    return v.map(x => isFinite(x) && x > 0 ? (d < 0 ? best / x : x / best) : 0);
   });
+  r.forEach((x, i) => { charts.radar.data.datasets[i].data = R.map(q => q[i]); });
+  charts.radar.options.scales.r.min = Math.max(0, Math.floor(Math.min(...R.flat()) * 20) / 20 - 0.05);
+  Object.values(charts).forEach(c => c.update());
 }
 
+// ---------- Update loop ----------
 function update() {
-  const ps = CFG.map(read), r = ps.map(simulate);
+  const rd = CFG.map(read), r = rd.map(x => simulate(x.p)), w = rd[CFG.indexOf(cur)].w;
+  last = r;
+  kpis(r); charts_(r); drawMap(); loadsSvg(r[CFG.indexOf(cur)]);
   $('res').innerHTML = OUT.map(([lab, k, u, dir, dp]) => {
-    const fmt = v => isFinite(v) ? v.toFixed(dp) : 'No launch';
     const d = r[1][k] - r[0][k], ok = isFinite(d);
     const cls = ok && dir && Math.abs(d) > 0.5 * 10 ** -dp ? (d * dir > 0 ? 'good' : 'bad') : '';
-    return `<tr><td>${lab} (${u})</td><td>${fmt(r[0][k])}</td><td>${fmt(r[1][k])}</td>
-      <td class="${cls}">${ok ? (d > 0 ? '+' : '') + d.toFixed(dp) : 'n/a'}</td></tr>`;
+    return `<tr><td>${lab} (${u})</td><td>${fmt(r[0][k], dp)}</td><td>${fmt(r[1][k], dp)}</td><td class="${cls}">${ok ? (d > 0 ? '+' : '') + d.toFixed(dp) : 'n/a'}</td></tr>`;
   }).join('');
   $('trackInfo').textContent = `Autocross track: generic ${r[0].dist.toFixed(0)} m layout, standing start. Skidpad radius ${SKID_R} m.`;
-  if (window.Chart) {
-    charts = charts || [mkChart('lapChart', 'Distance (m)'), mkChart('accChart', 'Time (s)')];
-    r.forEach((x, i) => { charts[0].data.datasets[i].data = x.lapTrace; charts[1].data.datasets[i].data = x.accTrace; });
-    charts.forEach(ch => ch.update());
-  }
-  try {
-    const s = {};
-    document.querySelectorAll('.form input, .form select').forEach(el => { s[el.id] = el.value; });
-    localStorage.setItem(STORE, JSON.stringify(s));
-  } catch (e) { /* storage unavailable */ }
+  let nd = 0;
+  [...FLD.map(f => f[0]), 'gears', 'type', 'drive'].forEach(k => {
+    const df = ['gears', 'type', 'drive'].includes(k) ? String(S.A[k]) !== String(S.B[k]) : +S.A[k] !== +S.B[k];
+    $('d_' + k).classList.toggle('on', df); $('d_' + k).title = df ? 'A and B differ' : ''; nd += df;
+    if ($('w_' + k)) { $('w_' + k).innerHTML = w[k] ? IC.warn + w[k] : ''; $('x_' + k).classList.toggle('w', !!w[k]); }
+  });
+  $('ndiff').textContent = nd ? nd + ' diff' : '';
+  try { localStorage.setItem(STORE, JSON.stringify({ S, cur })); } catch (e) { /* storage unavailable */ }
 }
+let tmr = 0;
+const schedule = () => { clearTimeout(tmr); tmr = setTimeout(update, 80); };
+const redraw = () => { fillForm(); update(); };
 
-let pending = false;
-const schedule = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; update(); }); } };
-
-CFG.forEach(buildForm);
+buildForm();
 try {
-  const s = JSON.parse(localStorage.getItem(STORE) || '{}');
-  Object.keys(s).forEach(id => { if ($(id)) $(id).value = s[id]; });
+  const s = JSON.parse(localStorage.getItem(STORE) || 'null');
+  if (s && s.S) CFG.forEach(c => { const o = s.S[c]; if (o && typeof o === 'object') { S[c] = Object.assign(rawDef(o.type === 'CV' ? 'CV' : 'EV'), o);
+    if (!['EV', 'CV'].includes(S[c].type)) S[c].type = 'EV'; if (!['RWD', 'AWD'].includes(S[c].drive)) S[c].drive = 'RWD'; } });
+  if (s && CFG.includes(s.cur)) cur = s.cur;
 } catch (e) { /* ignore bad storage */ }
-CFG.forEach(showPt);
 
-document.addEventListener('input', e => {
-  const m = /^([AB])_type$/.exec(e.target.id);
-  if (m) { $(m[1] + '_m').value = DEF_MASS[e.target.value]; showPt(m[1]); }
+$('form').addEventListener('input', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  S[cur][k] = e.target.value;
+  if (e.target.type === 'range') $('f_' + k).value = e.target.value;
+  else if (k !== 'gears' && isFinite(parseFloat(e.target.value))) $('s_' + k).value = e.target.value;
   schedule();
 });
-document.addEventListener('change', schedule);
-$('copy').addEventListener('click', () => {
-  $('cfgA').querySelectorAll('input, select').forEach(el => { $('B' + el.id.slice(1)).value = el.value; });
-  showPt('B'); update();
+document.addEventListener('click', e => {
+  const b = e.target.closest('.seg button'); if (!b || b.disabled) return;
+  const g = b.closest('.seg').dataset.g, v = b.dataset.v, s = S[cur];
+  if (g === 'cfg') cur = v;
+  else if (g === 'type' && s.type !== v) { s.type = v; s.m = DEF_MASS[v]; if (v === 'CV') s.drive = 'RWD'; }
+  else if (g === 'drive') s.drive = v;
+  redraw();
 });
-update();
+$('preset').addEventListener('change', e => {
+  const v = e.target.value, s = S[cur];
+  if (v === 'Typical EV' || v === 'Typical CV') S[cur] = rawDef(v.slice(-2));
+  else if (v === 'High downforce') Object.assign(s, { ClA: 4.5, CdA: 1.8, ab: 45 });
+  else if (v === 'Low drag') Object.assign(s, { ClA: 1.2, CdA: 0.8 });
+  e.target.value = ''; redraw();
+});
+$('reset').addEventListener('click', () => { S = { A: rawDef('EV'), B: rawDef('EV') }; redraw(); });
+$('copy').addEventListener('click', () => { S.B = JSON.parse(JSON.stringify(S.A)); redraw(); });
+$('swap').addEventListener('click', () => { S = { A: S.B, B: S.A }; redraw(); });
+let rz = 0;
+addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawMap, 100); });
+redraw();
 </script>
 </body>
 </html>
